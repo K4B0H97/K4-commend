@@ -1,5 +1,7 @@
 """Policy decisions for worker capability and tool requests."""
 
+import os.path
+
 from k4.types import CapabilityGrant, ToolRequest
 
 
@@ -16,6 +18,9 @@ HIGH_RISK_TOOLS = {
     "network.modify",
     "secret.read",
 }
+
+# 项目根目录，规范化处理
+PROJECT_ROOT = os.path.normpath(os.path.abspath("E:\\K4-command")).lower()
 
 
 def decide_tool_request(request: ToolRequest, grant: CapabilityGrant) -> str:
@@ -40,6 +45,16 @@ def _decide_file_scope(request: ToolRequest) -> str:
     path = request.args.get("path", "")
     if not path:
         return "deny"
-    if path.startswith("E:\\K4-command"):
+    
+    try:
+        # 规范化绝对路径，处理..、./、相对路径等
+        norm_path = os.path.normpath(os.path.abspath(path)).lower()
+    except (OSError, ValueError):
+        # 非法路径直接拒绝
+        return "deny"
+    
+    # 必须是项目根目录本身，或者项目根目录下的子路径（加os.sep防止前缀绕过）
+    # 例如 E:\K4-command-evil 不会匹配 E:\K4-command\
+    if norm_path == PROJECT_ROOT or norm_path.startswith(PROJECT_ROOT + os.sep):
         return "allow"
     return "deny"
